@@ -33,7 +33,8 @@ const VideoCall = ({ room, socket, onLeave }) => {
         });
         console.log("🎥 Media stream obtained:", {
           video: mediaStream.getVideoTracks().length > 0,
-          audio: mediaStream.getAudioTracks().length > 0
+          audio: mediaStream.getAudioTracks().length > 0,
+          tracks: mediaStream.getTracks().map(t => t.kind)
         });
         setStream(mediaStream);
         if (localVideoRef.current) {
@@ -46,6 +47,7 @@ const VideoCall = ({ room, socket, onLeave }) => {
       }
     };
 
+    console.log("🎥 Initializing media stream...");
     initMedia();
 
     return () => {
@@ -92,7 +94,8 @@ const VideoCall = ({ room, socket, onLeave }) => {
     peer.ontrack = (event) => {
       console.log("📹 Received remote track event:", {
         kind: event.track.kind,
-        streamCount: event.streams.length
+        streamCount: event.streams.length,
+        streams: event.streams.map(s => s.id)
       });
       const peerObj = peersRef.current.find(p => p.peerID === userToSignal);
       if (peerObj && peerObj.videoRef.current) {
@@ -123,10 +126,11 @@ const VideoCall = ({ room, socket, onLeave }) => {
 
     console.log("🔌 Setting up socket listeners with stream:", {
       video: stream.getVideoTracks().length > 0,
-      audio: stream.getAudioTracks().length > 0
+      audio: stream.getAudioTracks().length > 0,
+      tracks: stream.getTracks().map(t => t.kind)
     });
 
-    socket.on("user-joined", ({ peerID, userName }) => {
+    const handleUserJoined = ({ peerID, userName }) => {
       console.log("👋 New user joined event:", { peerID, userName });
       console.log("🎥 Current stream status:", stream.getTracks().map(t => t.kind));
       const peer = createPeer(peerID, socket.id, stream);
@@ -136,9 +140,9 @@ const VideoCall = ({ room, socket, onLeave }) => {
         videoRef: useRef(),
       });
       setPeers(users => [...users, { peerID, videoRef: useRef() }]);
-    });
+    };
 
-    socket.on("receiving-returned-signal", ({ signal, callerID }) => {
+    const handleReturnedSignal = ({ signal, callerID }) => {
       console.log("📡 Receiving signal from:", callerID, "Type:", signal.type || "ICE candidate");
       const item = peersRef.current.find(p => p.peerID === callerID);
       if (item) {
@@ -147,9 +151,9 @@ const VideoCall = ({ room, socket, onLeave }) => {
       } else {
         console.error("❌ Peer not found for signal:", callerID);
       }
-    });
+    };
 
-    socket.on("user-left", ({ peerID }) => {
+    const handleUserLeft = ({ peerID }) => {
       console.log("👋 User left event:", peerID);
       const peerObj = peersRef.current.find(p => p.peerID === peerID);
       if (peerObj) {
@@ -159,13 +163,17 @@ const VideoCall = ({ room, socket, onLeave }) => {
       const peers = peersRef.current.filter(p => p.peerID !== peerID);
       peersRef.current = peers;
       setPeers(users => users.filter(user => user.peerID !== peerID));
-    });
+    };
+
+    socket.on("user-joined", handleUserJoined);
+    socket.on("receiving-returned-signal", handleReturnedSignal);
+    socket.on("user-left", handleUserLeft);
 
     return () => {
       console.log("🧹 Cleaning up socket listeners");
-      socket.off("user-joined");
-      socket.off("receiving-returned-signal");
-      socket.off("user-left");
+      socket.off("user-joined", handleUserJoined);
+      socket.off("receiving-returned-signal", handleReturnedSignal);
+      socket.off("user-left", handleUserLeft);
     };
   }, [socket, stream]);
 
