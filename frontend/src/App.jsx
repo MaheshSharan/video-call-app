@@ -13,6 +13,11 @@ console.log('🌐 Environment:', import.meta.env.VITE_HOST);
 console.log('🔌 Backend URL:', SOCKET_URL);
 console.log('🚀 Running in:', import.meta.env.DEV ? 'Development' : 'Production');
 console.log('📡 Socket URL:', SOCKET_URL);
+console.log('🔍 Environment Variables:', {
+  VITE_HOST: import.meta.env.VITE_HOST,
+  VITE_SOCKET_URL: import.meta.env.VITE_SOCKET_URL,
+  NODE_ENV: import.meta.env.NODE_ENV
+});
 
 function generateRoomCode() {
   // Simple random code generator (6 uppercase letters/numbers)
