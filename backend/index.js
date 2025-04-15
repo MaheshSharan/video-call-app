@@ -103,6 +103,21 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Room validation endpoint
+app.get('/validate-room/:roomId', (req, res) => {
+  const { roomId } = req.params;
+  console.log('Validating room:', roomId);
+  
+  // Check if room exists in active rooms
+  const roomExists = io.sockets.adapter.rooms.has(roomId);
+  
+  res.json({
+    exists: roomExists,
+    roomId: roomId,
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Room management and signaling
 const roomHosts = {};
 io.on('connection', (socket) => {

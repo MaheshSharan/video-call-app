@@ -38,6 +38,18 @@ function AppContent() {
   const { addNotification } = useNotification();
   const connectionNotificationRef = useRef(null);
 
+  // Add room validation function
+  const validateRoom = async (roomCode) => {
+    try {
+      const response = await fetch(`${SOCKET_URL}/validate-room/${roomCode}`);
+      const data = await response.json();
+      return data.exists;
+    } catch (error) {
+      console.error('Error validating room:', error);
+      return false;
+    }
+  };
+
   // Socket connection logic
   useEffect(() => {
     let mounted = true;
@@ -166,16 +178,46 @@ function AppContent() {
     addNotification("Room created successfully", "success");
   };
 
-  const handleJoin = (e) => {
+  const handleJoin = async (e) => {
     e.preventDefault();
+    
+    // Basic validation
     if (room.trim().length < 3) {
       setError("Room code must be at least 3 characters");
       addNotification("Room code must be at least 3 characters", "error");
       return;
     }
-    setError("");
-    setJoined(true);
-    addNotification("Joining room...", "info");
+
+    // Show loading state
+    setShowLoader(true);
+    addNotification("Checking room availability...", "info");
+
+    try {
+      // Validate room existence
+      const roomExists = await validateRoom(room);
+      
+      if (!roomExists) {
+        setError("Room does not exist or is invalid");
+        addNotification("Room does not exist or is invalid", "error");
+        setShowLoader(false);
+        return;
+      }
+
+      // Room exists, proceed with joining
+      setError("");
+      setJoined(true);
+      addNotification("Joining room...", "success");
+      
+      // Hide loader after 3 seconds
+      setTimeout(() => {
+        setShowLoader(false);
+      }, 3000);
+    } catch (error) {
+      console.error('Error joining room:', error);
+      setError("Error checking room availability");
+      addNotification("Error checking room availability", "error");
+      setShowLoader(false);
+    }
   };
 
   const copyToClipboard = () => {
