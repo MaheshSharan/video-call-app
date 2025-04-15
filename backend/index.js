@@ -12,7 +12,7 @@ const server = http.createServer(app);
 // CORS configuration
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:5173', // Vercel frontend URL
-  'https://your-vercel-app.vercel.app' // Replace with your actual Vercel URL
+  'https://newmeetingfinal.vercel.app' // Your Vercel frontend URL
 ];
 
 const io = new Server(server, {
