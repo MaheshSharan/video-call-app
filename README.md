@@ -1,4 +1,4 @@
-# Video Call App
+# MeetSync
 
 A real-time video conferencing application using WebRTC and Socket.IO.
 
