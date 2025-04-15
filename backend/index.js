@@ -13,13 +13,20 @@ const server = http.createServer(app);
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:5173',
   'https://newmeetingfinal.vercel.app',
-  'http://localhost:5173'  // Add localhost for development
+  'http://localhost:5173',
+  'https://*.vercel.app'  // Allow all Vercel subdomains
 ];
 
 const io = new Server(server, {
   cors: {
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (!origin || allowedOrigins.some(allowed => {
+        if (allowed.includes('*')) {
+          const pattern = new RegExp('^' + allowed.replace('*', '.*') + '$');
+          return pattern.test(origin);
+        }
+        return allowed === origin;
+      })) {
         callback(null, true);
       } else {
         console.log('CORS blocked origin:', origin);
@@ -33,12 +40,22 @@ const io = new Server(server, {
   allowEIO3: true,
   pingTimeout: 60000,
   pingInterval: 25000,
-  cookie: false
+  cookie: false,
+  allowUpgrades: true,
+  perMessageDeflate: {
+    threshold: 1024
+  }
 });
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
+    if (!origin || allowedOrigins.some(allowed => {
+      if (allowed.includes('*')) {
+        const pattern = new RegExp('^' + allowed.replace('*', '.*') + '$');
+        return pattern.test(origin);
+      }
+      return allowed === origin;
+    })) {
       callback(null, true);
     } else {
       console.log('CORS blocked origin:', origin);

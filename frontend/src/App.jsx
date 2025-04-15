@@ -37,7 +37,7 @@ function AppContent() {
       if (!socketRef.current && joined && room) {
         console.log('🔄 Connecting to backend...');
         const socket = io(SOCKET_URL, {
-          transports: ['polling', 'websocket'],
+          transports: ['websocket', 'polling'],
           upgrade: true,
           forceNew: true,
           secure: true,
@@ -51,6 +51,10 @@ function AppContent() {
           withCredentials: true,
           extraHeaders: {
             'Access-Control-Allow-Origin': '*'
+          },
+          rememberUpgrade: true,
+          perMessageDeflate: {
+            threshold: 1024
           }
         });
 
