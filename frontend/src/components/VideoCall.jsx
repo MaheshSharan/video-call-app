@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useNotification } from "./contexts/NotificationContext";
 import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaPhone, FaExpand, FaCompress } from "react-icons/fa";
 
@@ -13,6 +13,7 @@ const VideoCall = ({ room, socket, onLeave }) => {
   const localVideoRef = useRef(null);
   const peersRef = useRef([]);
   const { addNotification } = useNotification();
+  const queuedIceCandidatesRef = useRef({});
 
   // Debug logs
   useEffect(() => {
@@ -116,6 +117,68 @@ const VideoCall = ({ room, socket, onLeave }) => {
 
     return peer;
   };
+
+  const handleSignal = useCallback((userId, signal) => {
+    console.log('handleSignal called', userId, signal);
+    if (!peersRef.current[userId]) {
+      console.log('Creating new peer connection for', userId);
+      const peer = createPeer(userId, socket.id, stream);
+      peersRef.current[userId] = peer;
+    }
+
+    const peer = peersRef.current[userId];
+    
+    if (signal.type === 'offer') {
+      console.log('Received offer from', userId);
+      if (peer.signalingState === 'stable') {
+        console.log('Setting remote description (offer) from', userId);
+        peer.setRemoteDescription(new RTCSessionDescription(signal))
+          .then(() => {
+            console.log('Creating and setting local description (answer) for', userId);
+            return peer.createAnswer();
+          })
+          .then(answer => {
+            console.log('Setting local description (answer) for', userId);
+            return peer.setLocalDescription(answer);
+          })
+          .then(() => {
+            console.log('Sending answer to', userId);
+            socket.emit('signal', { userId, signal: peer.localDescription });
+          })
+          .catch(error => {
+            console.error('Error handling offer:', error);
+          });
+      } else {
+        console.log('Peer connection not in stable state, current state:', peer.signalingState);
+      }
+    } else if (signal.type === 'answer') {
+      console.log('Received answer from', userId);
+      if (peer.signalingState === 'have-local-offer') {
+        console.log('Setting remote description (answer) from', userId);
+        peer.setRemoteDescription(new RTCSessionDescription(signal))
+          .catch(error => {
+            console.error('Error setting remote description:', error);
+          });
+      } else {
+        console.log('Peer connection not in have-local-offer state, current state:', peer.signalingState);
+      }
+    } else if (signal.type === 'candidate') {
+      console.log('Received ICE candidate from', userId);
+      if (peer.remoteDescription) {
+        console.log('Adding ICE candidate from', userId);
+        peer.addIceCandidate(new RTCIceCandidate(signal.candidate))
+          .catch(error => {
+            console.error('Error adding ICE candidate:', error);
+          });
+      } else {
+        console.log('Queueing ICE candidate from', userId);
+        if (!queuedIceCandidatesRef.current[userId]) {
+          queuedIceCandidatesRef.current[userId] = [];
+        }
+        queuedIceCandidatesRef.current[userId].push(signal.candidate);
+      }
+    }
+  }, [socket, createPeer, stream]);
 
   // Handle peer connections with explicit logging
   useEffect(() => {
