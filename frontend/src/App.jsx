@@ -4,6 +4,7 @@ import './index.css';
 import VideoCall from "./VideoCall";
 import { NotificationProvider, useNotification } from "./contexts/NotificationContext";
 import Loader from "./components/Loader";
+import { Analytics } from '@vercel/analytics/react';
 
 const SOCKET_URL = import.meta.env.VITE_HOST === 'prod' 
   ? 'https://video-call-app-yfcb.onrender.com'
@@ -427,6 +428,7 @@ export default function App() {
   return (
     <NotificationProvider>
       <AppContent />
+      <Analytics />
     </NotificationProvider>
   );
 }
