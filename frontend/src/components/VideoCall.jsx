@@ -14,6 +14,11 @@ const VideoCall = ({ room, socket, onLeave }) => {
   const peersRef = useRef([]);
   const { addNotification } = useNotification();
 
+  // Add console log to verify deployment
+  useEffect(() => {
+    console.log("🚀 VideoCall component mounted - Testing latest deployment");
+  }, []);
+
   // Check if mobile on resize
   useEffect(() => {
     const handleResize = () => {
