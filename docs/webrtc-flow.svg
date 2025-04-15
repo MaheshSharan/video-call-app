@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500">
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="8" refX="10" refY="4" orient="auto">
+      <polygon points="0 0, 10 4, 0 8" fill="#98A2B3"></polygon>
+    </marker>
+    <marker id="webrtc-arrowhead" markerWidth="10" markerHeight="8" refX="10" refY="4" orient="auto">
+      <polygon points="0 0, 10 4, 0 8" fill="#0969DA"></polygon>
+    </marker>
+    <filter id="drop-shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity="0.1" flood-color="#000000"></feDropShadow>
+    </filter>
+    <linearGradient id="bg-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0" stop-color="#FCFCFD"></stop>
+      <stop offset="1" stop-color="#F8FAFC"></stop>
+    </linearGradient>
+  </defs>
+  <rect x="1.675" y="43.642" width="500" height="375" fill="url(#bg-gradient)"></rect>
+  <text x="249.559" y="57.973" text-anchor="middle" class="title" style="white-space: pre; fill: rgb(16, 24, 40); font-family: Inter, sans-serif; font-size: 16.3px; font-weight: 700; line-height: 41.6px;">WebRTC Connection Flow</text>
+  <rect x="74.56" y="89.223" width="106.25" height="68.75" class="box user-box" filter="url(#drop-shadow)" style="fill: rgb(240, 247, 255); filter: drop-shadow(rgba(0, 0, 0, 0.05) 0px 4px 6px); rx: 12px; ry: 12px; stroke: rgb(204, 223, 251); stroke-width: 2px;"></rect>
+  <text x="127.685" y="107.973" text-anchor="middle" class="label" font-weight="600" style="white-space: pre; fill: rgb(71, 84, 103); font-family: Inter, sans-serif; font-size: 8.8px; line-height: 22.4px; pointer-events: none;">User 1</text>
+  <text x="127.685" y="123.598" text-anchor="middle" class="label" font-size="12" fill="#667085" style="white-space: pre; fill: rgb(71, 84, 103); font-family: Inter, sans-serif; font-size: 8.8px; line-height: 22.4px; pointer-events: none;">Client Browser</text>
+  <rect x="318.309" y="89.223" width="106.25" height="68.75" class="box user-box" filter="url(#drop-shadow)" style="fill: rgb(240, 247, 255); filter: drop-shadow(rgba(0, 0, 0, 0.05) 0px 4px 6px); rx: 12px; ry: 12px; stroke: rgb(204, 223, 251); stroke-width: 2px;"></rect>
+  <text x="371.434" y="107.973" text-anchor="middle" class="label" font-weight="600" style="white-space: pre; fill: rgb(71, 84, 103); font-family: Inter, sans-serif; font-size: 8.8px; line-height: 22.4px; pointer-events: none;">User 2</text>
+  <text x="371.434" y="123.598" text-anchor="middle" class="label" font-size="12" fill="#667085" style="white-space: pre; fill: rgb(71, 84, 103); font-family: Inter, sans-serif; font-size: 8.8px; line-height: 22.4px; pointer-events: none;">Client Browser</text>
+  <rect x="196.434" y="170.473" width="106.25" height="68.75" class="box server-box" filter="url(#drop-shadow)" style="fill: rgb(249, 248, 255); filter: drop-shadow(rgba(0, 0, 0, 0.05) 0px 4px 6px); rx: 12px; ry: 12px; stroke: rgb(224, 219, 250); stroke-width: 2px;"></rect>
+  <text x="249.559" y="189.223" text-anchor="middle" class="label" font-weight="600" style="white-space: pre; fill: rgb(71, 84, 103); font-family: Inter, sans-serif; font-size: 8.8px; line-height: 22.4px; pointer-events: none;">Signaling Server</text>
+  <text x="249.559" y="204.848" text-anchor="middle" class="label" font-size="12" fill="#667085" style="white-space: pre; fill: rgb(71, 84, 103); font-family: Inter, sans-serif; font-size: 8.8px; line-height: 22.4px; pointer-events: none;">Socket.IO/WebSockets</text>
+  <rect x="99.56" y="264.223" width="106.25" height="68.75" class="box server-box" filter="url(#drop-shadow)" style="fill: rgb(249, 248, 255); filter: drop-shadow(rgba(0, 0, 0, 0.05) 0px 4px 6px); rx: 12px; ry: 12px; stroke: rgb(224, 219, 250); stroke-width: 2px;"></rect>
+  <text x="152.684" y="282.973" text-anchor="middle" class="label" font-weight="600" style="white-space: pre; fill: rgb(71, 84, 103); font-family: Inter, sans-serif; font-size: 8.8px; line-height: 22.4px; pointer-events: none;">STUN Server</text>
+  <text x="152.684" y="298.598" text-anchor="middle" class="label" font-size="12" fill="#667085" style="white-space: pre; fill: rgb(71, 84, 103); font-family: Inter, sans-serif; font-size: 8.8px; line-height: 22.4px; pointer-events: none;">NAT Traversal</text>
+  <rect x="293.309" y="264.223" width="106.25" height="68.75" class="box server-box" filter="url(#drop-shadow)" style="fill: rgb(249, 248, 255); filter: drop-shadow(rgba(0, 0, 0, 0.05) 0px 4px 6px); rx: 12px; ry: 12px; stroke: rgb(224, 219, 250); stroke-width: 2px;"></rect>
+  <text x="346.434" y="282.973" text-anchor="middle" class="label" font-weight="600" style="white-space: pre; fill: rgb(71, 84, 103); font-family: Inter, sans-serif; font-size: 8.8px; line-height: 22.4px; pointer-events: none;">TURN Server</text>
+  <text x="346.434" y="298.598" text-anchor="middle" class="label" font-size="12" fill="#667085" style="white-space: pre; fill: rgb(71, 84, 103); font-family: Inter, sans-serif; font-size: 8.8px; line-height: 22.4px; pointer-events: none;">Relay Fallback</text>
+  <path d="M 127.684 157.973 C 167.267 174.639 190.184 188.181 196.434 198.598" class="arrow" fill="none" style="marker-end: url(#arrowhead); stroke: rgb(152, 162, 179); stroke-linecap: round; stroke-width: 2px;"></path>
+  <rect x="149.559" y="170.473" width="43.75" height="13.75" class="flow-badge" filter="url(#drop-shadow)" style="fill: rgb(255, 255, 255); rx: 12px; ry: 12px; stroke: rgb(224, 228, 232);"></rect>
+  <text x="171.434" y="179.848" text-anchor="middle" class="flow-label" style="white-space: pre; fill: rgb(71, 84, 103); font-family: Inter, sans-serif; font-size: 7.5px; font-weight: 500; line-height: 19.2px; pointer-events: none;">Signaling</text>
+  <path d="M 371.434 157.973 C 331.851 174.639 308.934 188.181 302.684 198.598" class="arrow" fill="none" style="marker-end: url(#arrowhead); stroke: rgb(152, 162, 179); stroke-linecap: round; stroke-width: 2px;"></path>
+  <rect x="324.559" y="170.473" width="43.75" height="13.75" class="flow-badge" filter="url(#drop-shadow)" style="fill: rgb(255, 255, 255); rx: 12px; ry: 12px; stroke: rgb(224, 228, 232);"></rect>
+  <text x="346.434" y="179.848" text-anchor="middle" class="flow-label" style="white-space: pre; fill: rgb(71, 84, 103); font-family: Inter, sans-serif; font-size: 7.5px; font-weight: 500; line-height: 19.2px; pointer-events: none;">Signaling</text>
+  <path d="M 112.059 239.223 C 112.059 247.556 115.184 255.889 121.434 264.223" class="arrow" fill="none" style="marker-end: url(#arrowhead); stroke: rgb(152, 162, 179); stroke-linecap: round; stroke-width: 2px;"></path>
+  <rect x="80.81" y="245.473" width="37.5" height="13.75" class="flow-badge" filter="url(#drop-shadow)" style="fill: rgb(255, 255, 255); rx: 12px; ry: 12px; stroke: rgb(224, 228, 232);"></rect>
+  <text x="99.56" y="254.848" text-anchor="middle" class="flow-label" style="white-space: pre; fill: rgb(71, 84, 103); font-family: Inter, sans-serif; font-size: 7.5px; font-weight: 500; line-height: 19.2px; pointer-events: none;">STUN</text>
+  <path d="M 362.059 239.223 C 362.059 247.556 356.851 255.889 346.434 264.223" class="arrow" fill="none" style="marker-end: url(#arrowhead); stroke: rgb(152, 162, 179); stroke-linecap: round; stroke-width: 2px;"></path>
+  <rect x="365.184" y="245.473" width="37.5" height="13.75" class="flow-badge" filter="url(#drop-shadow)" style="fill: rgb(255, 255, 255); rx: 12px; ry: 12px; stroke: rgb(224, 228, 232);"></rect>
+  <text x="383.934" y="254.848" text-anchor="middle" class="flow-label" style="white-space: pre; fill: rgb(71, 84, 103); font-family: Inter, sans-serif; font-size: 7.5px; font-weight: 500; line-height: 19.2px; pointer-events: none;">STUN</text>
+  <path d="M 152.684 332.973 C 217.267 347.556 271.434 347.556 315.184 332.973" class="arrow" fill="none" style="marker-end: url(#arrowhead); stroke: rgb(152, 162, 179); stroke-linecap: round; stroke-width: 2px;"></path>
+  <rect x="227.684" y="342.348" width="43.75" height="13.75" class="flow-badge" filter="url(#drop-shadow)" style="fill: rgb(255, 255, 255); rx: 12px; ry: 12px; stroke: rgb(224, 228, 232);"></rect>
+  <text x="249.559" y="351.723" text-anchor="middle" class="flow-label" style="white-space: pre; fill: rgb(71, 84, 103); font-family: Inter, sans-serif; font-size: 7.5px; font-weight: 500; line-height: 19.2px; pointer-events: none;">TURN Relay</text>
+  <path d="M 180.809 123.598 C 226.642 111.098 272.476 111.098 318.309 123.598" class="webrtc-connection" fill="none" style="marker-end: url(#webrtc-arrowhead); stroke: rgb(9, 105, 218); stroke-linecap: round; stroke-width: 2.5px;"></path>
+  <rect x="227.684" y="104.848" width="43.75" height="13.75" class="flow-badge" filter="url(#drop-shadow)" stroke="#0969DA" style="fill: rgb(255, 255, 255); rx: 12px; ry: 12px; stroke: rgb(224, 228, 232);"></rect>
+  <text x="249.559" y="114.223" text-anchor="middle" class="flow-label" fill="#0969DA" style="white-space: pre; fill: rgb(71, 84, 103); font-family: Inter, sans-serif; font-size: 7.5px; font-weight: 500; line-height: 19.2px; pointer-events: none;">WebRTC</text>
+  <line x1="127.685" y1="157.973" x2="127.685" y2="239.223" class="connection-line" stroke-dasharray="none" style="stroke: rgb(224, 228, 232); stroke-dasharray: 4px, 2px; stroke-width: 1.5px;"></line>
+  <line x1="371.434" y1="157.973" x2="371.434" y2="239.223" class="connection-line" stroke-dasharray="none" style="stroke: rgb(224, 228, 232); stroke-dasharray: 4px, 2px; stroke-width: 1.5px;"></line>
+  <line x1="112.06" y1="239.223" x2="362.059" y2="239.223" class="connection-line" stroke-dasharray="none" style="stroke: rgb(224, 228, 232); stroke-dasharray: 4px, 2px; stroke-width: 1.5px;"></line>
+</svg>
