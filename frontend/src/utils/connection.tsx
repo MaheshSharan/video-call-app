@@ -54,7 +54,26 @@ export const useWebRTCConnection = ({ room, socket, onRemoteStream, onUserLeft }
 
     // Listen for meeting-ended event
     const handleMeetingEnded = () => {
-      alert('The host has ended the meeting.');
+      // Stop all tracks before we're notified through the VideoCall component
+      if (localStream) {
+        localStream.getTracks().forEach(track => {
+          try {
+            track.stop();
+            console.log(`Stopped ${track.kind} track from connection utility`);
+          } catch (e) {
+            console.error(`Error stopping ${track.kind} track:`, e);
+          }
+        });
+      }
+      
+      // Close all peer connections
+      Object.values(peersRef.current).forEach(pc => {
+        try {
+          pc.close();
+        } catch (e) {
+          console.error("Error closing peer connection:", e);
+        }
+      });
     };
     socket.on('meeting-ended', handleMeetingEnded);
     cleanupHandlers.push(() => socket.off('meeting-ended', handleMeetingEnded));

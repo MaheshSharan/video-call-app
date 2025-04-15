@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useWebRTCConnection } from "./utils/connection";
+import { useNotification } from "./contexts/NotificationContext";
 
 const ICE_SERVERS = [
   { urls: "stun:stun.l.google.com:19302" },
@@ -12,6 +13,7 @@ export default function VideoCall({ room, socket, onLeave }) {
   const [muted, setMuted] = useState(false);
   const [cameraOn, setCameraOn] = useState(true);
   const [, forceUpdate] = useState(0);
+  const { addNotification } = useNotification();
 
   // Use the connection hook
   const { localStream, remoteStreams } = useWebRTCConnection({
@@ -52,15 +54,65 @@ export default function VideoCall({ room, socket, onLeave }) {
     if (!socket) return;
     
     const handleMeetingEnded = () => {
-      alert('The host has ended the meeting.');
-      if (onLeave) onLeave();
+      // Use custom notification instead of alert
+      addNotification("The host has ended the meeting", "warning");
+      
+      // Force stop all tracks before leaving
+      if (localStream) {
+        localStream.getTracks().forEach(track => {
+          try {
+            // First disable the track
+            track.enabled = false;
+            // Then stop it
+            track.stop();
+            console.log(`Stopped ${track.kind} track from meeting-ended handler`);
+          } catch (e) {
+            console.error(`Error stopping ${track.kind} track:`, e);
+          }
+        });
+      }
+      
+      // Reset video element srcObject to null
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = null;
+      }
+      
+      // Slight delay to let notification be visible
+      setTimeout(() => {
+        if (onLeave) onLeave();
+      }, 1500);
     };
     
     socket.on('meeting-ended', handleMeetingEnded);
     return () => {
       socket.off('meeting-ended', handleMeetingEnded);
     };
-  }, [socket, onLeave]);
+  }, [socket, onLeave, localStream, addNotification]);
+
+  // Ensure proper cleanup of media tracks
+  useEffect(() => {
+    return () => {
+      // Clean up all media tracks when component unmounts
+      if (localStream) {
+        localStream.getTracks().forEach(track => {
+          try {
+            // First disable the track
+            track.enabled = false;
+            // Then stop it
+            track.stop();
+            console.log(`Stopped ${track.kind} track from cleanup effect`);
+          } catch (e) {
+            console.error(`Error stopping ${track.kind} track:`, e);
+          }
+        });
+      }
+      
+      // Reset video element srcObject to null
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = null;
+      }
+    };
+  }, [localStream]);
 
   // Chat send function
   function sendChat(e) {
@@ -90,6 +142,26 @@ export default function VideoCall({ room, socket, onLeave }) {
   }
 
   function leaveCall() {
+    // Stop all media tracks before leaving
+    if (localStream) {
+      localStream.getTracks().forEach(track => {
+        try {
+          // First disable the track
+          track.enabled = false;
+          // Then stop it
+          track.stop();
+          console.log(`Stopped ${track.kind} track from leaveCall`);
+        } catch (e) {
+          console.error(`Error stopping ${track.kind} track:`, e);
+        }
+      });
+    }
+    
+    // Reset video element srcObject to null
+    if (localVideoRef.current) {
+      localVideoRef.current.srcObject = null;
+    }
+    
     if (onLeave) onLeave();
     else window.location.reload();
   }

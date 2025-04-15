@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { io } from "socket.io-client";
 import './index.css';
 import VideoCall from "./VideoCall";
+import { NotificationProvider, useNotification } from "./contexts/NotificationContext";
 
 const SOCKET_URL = "http://localhost:5000"; // Backend URL
 
@@ -10,7 +11,7 @@ function generateRoomCode() {
   return Math.random().toString(36).substring(2, 8).toUpperCase();
 }
 
-export default function App() {
+function AppContent() {
   const [mode, setMode] = useState(null); // 'create' | 'join' | null
   const [room, setRoom] = useState("");
   const [createdRoom, setCreatedRoom] = useState("");
@@ -19,23 +20,62 @@ export default function App() {
   const [socketConnected, setSocketConnected] = useState(false);
   const socketRef = useRef(null);
   const [copied, setCopied] = useState(false);
+  const { addNotification } = useNotification();
+  const connectionNotificationRef = useRef(null);
 
-  // Connect to socket when joining
+  // Socket connection logic
   useEffect(() => {
-    if (joined && room) {
-      if (!socketRef.current) {
-        socketRef.current = io(SOCKET_URL);
+    let mounted = true;
+
+    const connectSocket = () => {
+      if (!socketRef.current && joined && room) {
+        socketRef.current = io(SOCKET_URL, {
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
+          transports: ['websocket', 'polling'],
+        });
+
+        const socket = socketRef.current;
+
+        socket.on("connect", () => {
+          if (mounted) {
+            setSocketConnected(true);
+            if (!connectionNotificationRef.current) {
+              connectionNotificationRef.current = addNotification("Connected to the server", "success");
+            }
+            socket.emit("join-room", room);
+          }
+        });
+
+        socket.on("disconnect", () => {
+          if (mounted) {
+            setSocketConnected(false);
+            connectionNotificationRef.current = null;
+            addNotification("Disconnected from server", "warning");
+          }
+        });
+
+        socket.on("connect_error", (error) => {
+          if (mounted) {
+            addNotification("Connection error: " + error.message, "error");
+          }
+        });
       }
-      const socket = socketRef.current;
-      socket.on("connect", () => setSocketConnected(true));
-      socket.emit("join-room", room);
-      // Clean up on unmount
-      return () => {
-        socket.disconnect();
+    };
+
+    connectSocket();
+
+    return () => {
+      mounted = false;
+      if (socketRef.current) {
+        socketRef.current.disconnect();
         socketRef.current = null;
-      };
-    }
-  }, [joined, room]);
+        setSocketConnected(false);
+        connectionNotificationRef.current = null;
+      }
+    };
+  }, [joined, room, addNotification]);
 
   useEffect(() => {
     // On mount, check if there is a room in localStorage
@@ -64,55 +104,91 @@ export default function App() {
     setRoom(code);
     setMode('create');
     setError("");
-    // Clear previous state
     localStorage.setItem('activeRoom', code);
     localStorage.setItem('joined', 'false');
+    addNotification("Room created successfully", "success");
   };
 
   const handleJoin = (e) => {
     e.preventDefault();
     if (room.trim().length < 3) {
       setError("Room code must be at least 3 characters");
+      addNotification("Room code must be at least 3 characters", "error");
       return;
     }
     setError("");
     setJoined(true);
+    addNotification("Joining room...", "info");
   };
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(createdRoom);
     setCopied(true);
+    addNotification("Room code copied to clipboard", "success");
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Landing page: Choose Create or Join
+  // Landing page
   if (!mode && !joined) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-800 to-purple-900 p-4">
-        <div className="bg-white bg-opacity-10 rounded-3xl shadow-2xl p-10 w-full max-w-lg flex flex-col gap-8 border border-white border-opacity-20">
-          <div className="flex flex-col items-center gap-3">
-            <div className="p-4 bg-blue-500 rounded-2xl shadow-lg mb-2">
-              <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4f9.png" alt="Video" className="w-12 h-12" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-900 to-blue-900 page-transition">
+        <div className="container mx-auto px-4 py-16">
+          <div className="max-w-6xl mx-auto">
+            <div className="text-center mb-16 animate-fade-in">
+              <div className="inline-block p-4 bg-indigo-600 rounded-2xl shadow-lg mb-6 transform hover:scale-105 transition-transform duration-300 hover-lift">
+                <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4f9.png" alt="Video" className="w-16 h-16" />
+              </div>
+              <h1 className="text-5xl md:text-6xl font-bold text-white mb-4 tracking-tight animate-slide-in">
+                Modern Meet
+              </h1>
+              <p className="text-xl text-indigo-200 max-w-2xl mx-auto animate-fade-in">
+                Professional video meetings with crystal clear quality. No sign up required.
+              </p>
             </div>
-            <h1 className="text-5xl font-extrabold text-white text-center tracking-tight">Modern Meet</h1>
-            <p className="text-blue-100 text-center text-base font-medium">Seamless video meetings. No sign up required.</p>
-          </div>
-          
-          <div className="flex flex-col sm:flex-row gap-6 w-full justify-center">
-            <button
-              className="flex-1 px-6 py-4 bg-blue-600 text-white rounded-2xl shadow-lg font-semibold text-xl hover:bg-blue-700 transition-all duration-300 flex flex-col items-center gap-2"
-              onClick={handleCreate}
-            >
-              <span className="text-2xl">✨</span>
-              Create Room
-            </button>
-            <button
-              className="flex-1 px-6 py-4 bg-green-600 text-white rounded-2xl shadow-lg font-semibold text-xl hover:bg-green-700 transition-all duration-300 flex flex-col items-center gap-2"
-              onClick={() => setMode('join')}
-            >
-              <span className="text-2xl">🔑</span>
-              Join Room
-            </button>
+
+            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+              <div className="glass-effect rounded-2xl p-8 hover:border-indigo-500/50 transition-all duration-300 animate-scale-in hover-lift">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="p-3 bg-indigo-600 rounded-xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                  </div>
+                  <h2 className="text-2xl font-bold text-white">Create Meeting</h2>
+                </div>
+                <p className="text-indigo-200 mb-6">
+                  Start a new meeting and invite others with a simple room code.
+                </p>
+                <button
+                  onClick={handleCreate}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 button-hover"
+                >
+                  <span className="text-xl">✨</span>
+                  Create Room
+                </button>
+              </div>
+
+              <div className="glass-effect rounded-2xl p-8 hover:border-indigo-500/50 transition-all duration-300 animate-scale-in hover-lift">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="p-3 bg-green-600 rounded-xl">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 6v12a2 2 0 002 2h8a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2z" />
+                    </svg>
+                  </div>
+                  <h2 className="text-2xl font-bold text-white">Join Meeting</h2>
+                </div>
+                <p className="text-indigo-200 mb-6">
+                  Join an existing meeting with a room code from the host.
+                </p>
+                <button
+                  onClick={() => setMode('join')}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 button-hover"
+                >
+                  <span className="text-xl">🔑</span>
+                  Join Room
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -122,63 +198,64 @@ export default function App() {
   // Create Room view
   if (mode === 'create' && !joined) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-800 to-purple-900 p-4">
-        <div className="bg-white bg-opacity-10 rounded-3xl shadow-2xl p-10 w-full max-w-md flex flex-col gap-8 border border-white border-opacity-20 items-center">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="p-3 bg-blue-600 rounded-xl shadow-lg">
-              <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4f9.png" alt="Video" className="w-8 h-8" />
-            </div>
-            <h2 className="text-2xl font-bold text-white text-center">Share Room Code</h2>
-          </div>
-          
-          <div className="flex flex-col items-center gap-4 w-full">
-            <div className="w-full bg-black bg-opacity-20 rounded-2xl border border-white border-opacity-10 p-6 flex items-center justify-center">
-              <span className="font-mono text-3xl text-blue-100 tracking-widest select-all">{createdRoom}</span>
-            </div>
-            
-            <button
-              className={`w-full px-4 py-3 ${copied ? 'bg-green-500' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-xl shadow font-medium text-lg transition-all duration-300 flex items-center justify-center gap-2`}
-              onClick={copyToClipboard}
-            >
-              {copied ? (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 6L9 17l-5-5" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-900 to-blue-900 page-transition">
+        <div className="container mx-auto px-4 py-16">
+          <div className="max-w-2xl mx-auto">
+            <div className="glass-effect rounded-2xl p-8 animate-scale-in">
+              <div className="flex items-center gap-4 mb-8 animate-slide-in">
+                <div className="p-3 bg-indigo-600 rounded-xl">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  Copied!
-                </>
-              ) : (
-                <>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
-                    <path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" />
+                </div>
+                <h2 className="text-2xl font-bold text-white">Share Room Code</h2>
+              </div>
+
+              <div className="space-y-6">
+                <div className="bg-black/20 rounded-xl p-6 border border-white/10 animate-fade-in">
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-3xl text-indigo-200 tracking-widest">{createdRoom}</span>
+                    <button
+                      onClick={copyToClipboard}
+                      className={`p-2 rounded-lg transition-all duration-300 ${
+                        copied ? 'bg-green-600' : 'bg-indigo-600 hover:bg-indigo-700'
+                      } button-hover`}
+                    >
+                      {copied ? (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      ) : (
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setJoined(true)}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 button-hover"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 6v12a2 2 0 002 2h8a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2z" />
                   </svg>
-                  Copy Code
-                </>
-              )}
-            </button>
-            
-            <button
-              className="w-full mt-2 px-4 py-4 bg-green-600 text-white rounded-xl shadow font-semibold text-lg hover:bg-green-700 transition-all duration-300 flex items-center justify-center gap-2"
-              onClick={(e) => { setJoined(true); }}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M15 10l5 5-5 5" />
-                <path d="M4 4v7a4 4 0 004 4h12" />
-              </svg>
-              Start Meeting
-            </button>
+                  Start Meeting
+                </button>
+
+                <button
+                  onClick={() => { setMode(null); setCreatedRoom(""); setRoom(""); }}
+                  className="text-indigo-300 hover:text-white transition-all duration-300 flex items-center gap-2 justify-center button-hover"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                  Back to Home
+                </button>
+              </div>
+            </div>
           </div>
-          
-          <button 
-            className="text-blue-200 hover:text-white mt-4 transition-all duration-200 flex items-center gap-1" 
-            onClick={() => { setMode(null); setCreatedRoom(""); setRoom(""); }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
-            Back to Home
-          </button>
         </div>
       </div>
     );
@@ -187,92 +264,102 @@ export default function App() {
   // Join Room view
   if (mode === 'join' && !joined) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-800 to-purple-900 p-4">
-        <div className="bg-white bg-opacity-10 rounded-3xl shadow-2xl p-10 w-full max-w-md flex flex-col gap-8 border border-white border-opacity-20 items-center">
-          <div className="flex items-center gap-2 mb-2">
-            <div className="p-3 bg-green-600 rounded-xl shadow-lg">
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-white">
-                <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M13.8 12H3" />
-              </svg>
-            </div>
-            <h2 className="text-2xl font-bold text-white text-center">Join a Room</h2>
-          </div>
-          
-          <form onSubmit={handleJoin} className="flex flex-col gap-6 w-full">
-            <div className="relative">
-              <input
-                type="text"
-                placeholder="ENTER ROOM CODE"
-                value={room}
-                onChange={(e) => setRoom(e.target.value.toUpperCase())}
-                className="w-full px-6 py-4 rounded-xl border border-white border-opacity-20 focus:border-blue-400 outline-none text-xl text-white bg-black bg-opacity-20 placeholder-blue-300 transition tracking-widest text-center font-mono"
-                required
-                maxLength={32}
-                autoFocus
-              />
-              {room && (
-                <button 
-                  type="button"
-                  className="absolute right-4 top-1/2 transform -translate-y-1/2 text-blue-300 hover:text-white"
-                  onClick={() => setRoom("")}
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <path d="M15 9l-6 6M9 9l6 6" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-900 to-blue-900 page-transition">
+        <div className="container mx-auto px-4 py-16">
+          <div className="max-w-2xl mx-auto">
+            <div className="glass-effect rounded-2xl p-8 animate-scale-in">
+              <div className="flex items-center gap-4 mb-8 animate-slide-in">
+                <div className="p-3 bg-green-600 rounded-xl">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 6v12a2 2 0 002 2h8a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2z" />
                   </svg>
+                </div>
+                <h2 className="text-2xl font-bold text-white">Join a Meeting</h2>
+              </div>
+
+              <form onSubmit={handleJoin} className="space-y-6">
+                <div className="relative animate-fade-in">
+                  <input
+                    type="text"
+                    placeholder="ENTER ROOM CODE"
+                    value={room}
+                    onChange={(e) => setRoom(e.target.value.toUpperCase())}
+                    className="w-full px-6 py-4 rounded-xl border border-white/20 focus:border-indigo-500 outline-none text-xl text-white bg-black/20 placeholder-indigo-300 transition tracking-widest text-center font-mono input-focus"
+                    required
+                    maxLength={32}
+                    autoFocus
+                  />
+                  {room && (
+                    <button
+                      type="button"
+                      onClick={() => setRoom("")}
+                      className="absolute right-4 top-1/2 transform -translate-y-1/2 text-indigo-300 hover:text-white transition-colors duration-300 button-hover"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-4 px-6 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 button-hover"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M4 6v12a2 2 0 002 2h8a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2z" />
+                  </svg>
+                  Join Meeting
                 </button>
-              )}
+
+                {error && (
+                  <div className="bg-red-500/20 border border-red-500/30 rounded-xl p-4 animate-fade-in">
+                    <p className="text-red-200 text-center font-medium flex items-center justify-center gap-2">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      {error}
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => { setMode(null); setRoom(""); }}
+                  className="text-indigo-300 hover:text-white transition-all duration-300 flex items-center gap-2 justify-center button-hover"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                  </svg>
+                  Back to Home
+                </button>
+              </form>
             </div>
-            
-            <button
-              type="submit"
-              className="px-4 py-4 bg-green-600 text-white rounded-xl shadow font-semibold text-lg hover:bg-green-700 transition-all duration-300 flex items-center justify-center gap-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4M10 17l5-5-5-5M13.8 12H3" />
-              </svg>
-              Join Meeting
-            </button>
-          </form>
-          
-          {error && (
-            <div className="w-full p-4 bg-red-500 bg-opacity-20 border border-red-500 border-opacity-30 rounded-xl">
-              <p className="text-red-200 text-center font-medium flex items-center justify-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-                {error}
-              </p>
-            </div>
-          )}
-          
-          <button 
-            className="text-blue-200 hover:text-white mt-4 transition-all duration-200 flex items-center gap-1" 
-            onClick={() => { setMode(null); setRoom(""); setError(""); }}
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H5M12 19l-7-7 7-7" />
-            </svg>
-            Back to Home
-          </button>
+          </div>
         </div>
       </div>
     );
   }
 
   // Meeting room placeholder
-  if (joined) {
-    return (
-      <VideoCall room={room} socket={socketRef.current} onLeave={() => {
-        setJoined(false);
-        setMode(null);
-        setRoom("");
-        setCreatedRoom("");
-        localStorage.removeItem('activeRoom');
-        localStorage.removeItem('joined');
-      }} />
-    );
+  if (joined && socketConnected) {
+    return <VideoCall room={room} socket={socketRef.current} onLeave={() => {
+      setJoined(false);
+      setMode(null);
+      setRoom("");
+      setCreatedRoom("");
+      localStorage.removeItem('activeRoom');
+      localStorage.removeItem('joined');
+    }} />;
   }
+
+  return null;
+}
+
+export default function App() {
+  return (
+    <NotificationProvider>
+      <AppContent />
+    </NotificationProvider>
+  );
 }
