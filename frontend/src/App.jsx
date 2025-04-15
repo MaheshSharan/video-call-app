@@ -5,13 +5,14 @@ import VideoCall from "./VideoCall";
 import { NotificationProvider, useNotification } from "./contexts/NotificationContext";
 import Loader from "./components/Loader";
 
-const SOCKET_URL = import.meta.env.VITE_HOST === 'dev' 
-  ? import.meta.env.VITE_SOCKET_URL 
-  : 'http://localhost:5000';
+const SOCKET_URL = import.meta.env.VITE_HOST === 'prod' 
+  ? 'https://video-call-app-yfcb.onrender.com'
+  : import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000';
 
 console.log('🌐 Environment:', import.meta.env.VITE_HOST);
 console.log('🔌 Backend URL:', SOCKET_URL);
 console.log('🚀 Running in:', import.meta.env.DEV ? 'Development' : 'Production');
+console.log('📡 Socket URL:', SOCKET_URL);
 
 function generateRoomCode() {
   // Simple random code generator (6 uppercase letters/numbers)
