@@ -3,6 +3,7 @@ import { io } from "socket.io-client";
 import './index.css';
 import VideoCall from "./VideoCall";
 import { NotificationProvider, useNotification } from "./contexts/NotificationContext";
+import Loader from "./components/Loader";
 
 const SOCKET_URL = import.meta.env.VITE_HOST === 'dev' 
   ? import.meta.env.VITE_SOCKET_URL 
@@ -24,6 +25,7 @@ function AppContent() {
   const [joined, setJoined] = useState(false);
   const [error, setError] = useState("");
   const [socketConnected, setSocketConnected] = useState(false);
+  const [showLoader, setShowLoader] = useState(false);
   const socketRef = useRef(null);
   const [copied, setCopied] = useState(false);
   const { addNotification } = useNotification();
@@ -134,6 +136,18 @@ function AppContent() {
     }
   }, [joined, room]);
 
+  useEffect(() => {
+    if (joined && !socketConnected) {
+      setShowLoader(true);
+      const timer = setTimeout(() => {
+        setShowLoader(false);
+      }, 3000);
+      return () => clearTimeout(timer);
+    } else if (socketConnected) {
+      setShowLoader(false);
+    }
+  }, [joined, socketConnected]);
+
   const handleCreate = () => {
     const code = generateRoomCode();
     setCreatedRoom(code);
@@ -164,26 +178,26 @@ function AppContent() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // Landing page
+  // Landing page with responsive design
   if (!mode && !joined) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-900 to-blue-900 page-transition">
-        <div className="container mx-auto px-4 py-16">
+        <div className="container mx-auto px-4 py-8 sm:py-16">
           <div className="max-w-6xl mx-auto">
-            <div className="text-center mb-16 animate-fade-in">
-              <div className="inline-block p-4 bg-indigo-600 rounded-2xl shadow-lg mb-6 transform hover:scale-105 transition-transform duration-300 hover-lift">
-                <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4f9.png" alt="Video" className="w-16 h-16" />
+            <div className="text-center mb-8 sm:mb-16 animate-fade-in">
+              <div className="inline-block p-3 sm:p-4 bg-indigo-600 rounded-2xl shadow-lg mb-4 sm:mb-6 transform hover:scale-105 transition-transform duration-300 hover-lift">
+                <img src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f4f9.png" alt="Video" className="w-12 h-12 sm:w-16 sm:h-16" />
               </div>
-              <h1 className="text-5xl md:text-6xl font-bold text-white mb-4 tracking-tight animate-slide-in">
+              <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold text-white mb-4 tracking-tight animate-slide-in">
                 Modern Meet
               </h1>
-              <p className="text-xl text-indigo-200 max-w-2xl mx-auto animate-fade-in">
+              <p className="text-lg sm:text-xl text-indigo-200 max-w-2xl mx-auto animate-fade-in px-4">
                 Professional video meetings with crystal clear quality. No sign up required.
               </p>
             </div>
 
-            <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-              <div className="glass-effect rounded-2xl p-8 hover:border-indigo-500/50 transition-all duration-300 animate-scale-in hover-lift">
+            <div className="grid md:grid-cols-2 gap-6 sm:gap-8 max-w-4xl mx-auto px-4">
+              <div className="glass-effect rounded-2xl p-6 sm:p-8 hover:border-indigo-500/50 transition-all duration-300 animate-scale-in hover-lift">
                 <div className="flex items-center gap-4 mb-6">
                   <div className="p-3 bg-indigo-600 rounded-xl">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -204,7 +218,7 @@ function AppContent() {
                 </button>
               </div>
 
-              <div className="glass-effect rounded-2xl p-8 hover:border-indigo-500/50 transition-all duration-300 animate-scale-in hover-lift">
+              <div className="glass-effect rounded-2xl p-6 sm:p-8 hover:border-indigo-500/50 transition-all duration-300 animate-scale-in hover-lift">
                 <div className="flex items-center gap-4 mb-6">
                   <div className="p-3 bg-green-600 rounded-xl">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -231,13 +245,13 @@ function AppContent() {
     );
   }
 
-  // Create Room view
+  // Create Room view with responsive design
   if (mode === 'create' && !joined) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-900 to-blue-900 page-transition">
-        <div className="container mx-auto px-4 py-16">
+        <div className="container mx-auto px-4 py-8 sm:py-16">
           <div className="max-w-2xl mx-auto">
-            <div className="glass-effect rounded-2xl p-8 animate-scale-in">
+            <div className="glass-effect rounded-2xl p-6 sm:p-8 animate-scale-in">
               <div className="flex items-center gap-4 mb-8 animate-slide-in">
                 <div className="p-3 bg-indigo-600 rounded-xl">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -297,13 +311,13 @@ function AppContent() {
     );
   }
 
-  // Join Room view
+  // Join Room view with responsive design
   if (mode === 'join' && !joined) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-900 to-blue-900 page-transition">
-        <div className="container mx-auto px-4 py-16">
+        <div className="container mx-auto px-4 py-8 sm:py-16">
           <div className="max-w-2xl mx-auto">
-            <div className="glass-effect rounded-2xl p-8 animate-scale-in">
+            <div className="glass-effect rounded-2xl p-6 sm:p-8 animate-scale-in">
               <div className="flex items-center gap-4 mb-8 animate-slide-in">
                 <div className="p-3 bg-green-600 rounded-xl">
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -377,16 +391,27 @@ function AppContent() {
     );
   }
 
-  // Meeting room placeholder
-  if (joined && socketConnected) {
-    return <VideoCall room={room} socket={socketRef.current} onLeave={() => {
-      setJoined(false);
-      setMode(null);
-      setRoom("");
-      setCreatedRoom("");
-      localStorage.removeItem('activeRoom');
-      localStorage.removeItem('joined');
-    }} />;
+  // Meeting room with loader
+  if (joined) {
+    return (
+      <>
+        {showLoader && !socketConnected && <Loader />}
+        {socketConnected && (
+          <VideoCall 
+            room={room} 
+            socket={socketRef.current} 
+            onLeave={() => {
+              setJoined(false);
+              setMode(null);
+              setRoom("");
+              setCreatedRoom("");
+              localStorage.removeItem('activeRoom');
+              localStorage.removeItem('joined');
+            }} 
+          />
+        )}
+      </>
+    );
   }
 
   return null;
