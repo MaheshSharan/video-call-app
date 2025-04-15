@@ -40,12 +40,13 @@ function AppContent() {
           reconnection: true,
           reconnectionAttempts: 5,
           reconnectionDelay: 1000,
-          transports: ['websocket', 'polling'],
+          transports: ['polling', 'websocket'],
           upgrade: true,
           forceNew: true,
           secure: true,
           rejectUnauthorized: false,
-          path: '/socket.io/'
+          path: '/socket.io/',
+          timeout: 20000
         });
 
         const socket = socketRef.current;

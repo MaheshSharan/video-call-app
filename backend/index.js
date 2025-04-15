@@ -44,6 +44,30 @@ app.get('/', (req, res) => {
   res.send('Video Call Backend Running');
 });
 
+// Test endpoint with detailed logging
+app.get('/test', (req, res) => {
+  try {
+    console.log('Test endpoint hit!');
+    console.log('Request headers:', req.headers);
+    console.log('Request origin:', req.headers.origin);
+    
+    res.json({
+      status: 'success',
+      message: 'Backend is accessible!',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      host: req.headers.host
+    });
+  } catch (error) {
+    console.error('Test endpoint error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: 'Internal server error',
+      error: error.message
+    });
+  }
+});
+
 // Room management and signaling
 const roomHosts = {};
 io.on('connection', (socket) => {
