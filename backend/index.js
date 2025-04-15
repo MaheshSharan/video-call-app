@@ -46,6 +46,17 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Handle media status changes (camera/mic on/off)
+  socket.on('media-status-change', ({ roomId, audioEnabled, videoEnabled }) => {
+    console.log(`[${socket.id}] media status changed in room ${roomId}:`, { audioEnabled, videoEnabled });
+    // Relay to all other users in the room
+    socket.to(roomId).emit('media-status-change', { 
+      senderId: socket.id, 
+      audioEnabled, 
+      videoEnabled 
+    });
+  });
+
   socket.on('chat-message', ({ roomId, message }) => {
     console.log(`[${socket.id}] chat in room ${roomId}:`, message);
     io.to(roomId).emit('chat-message', { sender: socket.id, message });
