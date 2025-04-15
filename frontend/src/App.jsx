@@ -4,7 +4,9 @@ import './index.css';
 import VideoCall from "./VideoCall";
 import { NotificationProvider, useNotification } from "./contexts/NotificationContext";
 
-const SOCKET_URL = "http://localhost:5000"; // Backend URL
+const SOCKET_URL = import.meta.env.VITE_HOST === 'prod' 
+  ? import.meta.env.VITE_SOCKET_URL 
+  : "http://localhost:5000"; // Backend URL
 
 function generateRoomCode() {
   // Simple random code generator (6 uppercase letters/numbers)
