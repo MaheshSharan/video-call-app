@@ -14,10 +14,84 @@ const VideoCall = ({ room, socket, onLeave }) => {
   const peersRef = useRef([]);
   const { addNotification } = useNotification();
 
-  // Add console log to verify deployment
+  // Debug logs
   useEffect(() => {
-    console.log("🚀 VideoCall component mounted - Testing latest deployment");
+    console.log("🚀 VideoCall component mounted");
+    console.log("📡 Socket connected:", socket?.connected);
+    console.log("🎥 Stream status:", stream ? "Active" : "Not active");
+    console.log("👥 Current peers:", peers.length);
+  }, [socket, stream, peers]);
+
+  // Initialize media stream
+  useEffect(() => {
+    const initMedia = async () => {
+      try {
+        console.log("🎥 Initializing media stream...");
+        const mediaStream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: true,
+        });
+        console.log("🎥 Media stream obtained successfully");
+        setStream(mediaStream);
+        if (localVideoRef.current) {
+          localVideoRef.current.srcObject = mediaStream;
+        }
+      } catch (error) {
+        console.error("❌ Error accessing media devices:", error);
+        addNotification("Error accessing camera/microphone", "error");
+      }
+    };
+
+    initMedia();
+
+    return () => {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
   }, []);
+
+  // Handle peer connections
+  useEffect(() => {
+    if (!socket || !stream) return;
+
+    console.log("🔌 Setting up socket listeners...");
+
+    socket.on("user-joined", ({ peerID, userName }) => {
+      console.log("👋 New user joined:", peerID);
+      const peer = createPeer(peerID, socket.id, stream);
+      peersRef.current.push({
+        peerID,
+        peer,
+        videoRef: useRef(),
+      });
+      setPeers(users => [...users, { peerID, videoRef: useRef() }]);
+    });
+
+    socket.on("receiving-returned-signal", ({ signal, callerID }) => {
+      console.log("📡 Receiving returned signal from:", callerID);
+      const item = peersRef.current.find(p => p.peerID === callerID);
+      item.peer.signal(signal);
+    });
+
+    socket.on("user-left", ({ peerID }) => {
+      console.log("👋 User left:", peerID);
+      const peerObj = peersRef.current.find(p => p.peerID === peerID);
+      if (peerObj) {
+        peerObj.peer.destroy();
+      }
+      const peers = peersRef.current.filter(p => p.peerID !== peerID);
+      peersRef.current = peers;
+      setPeers(users => users.filter(user => user.peerID !== peerID));
+    });
+
+    return () => {
+      console.log("🧹 Cleaning up socket listeners");
+      socket.off("user-joined");
+      socket.off("receiving-returned-signal");
+      socket.off("user-left");
+    };
+  }, [socket, stream]);
 
   // Check if mobile on resize
   useEffect(() => {
@@ -27,8 +101,6 @@ const VideoCall = ({ room, socket, onLeave }) => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
-
-  // ... existing socket connection and peer connection code ...
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
