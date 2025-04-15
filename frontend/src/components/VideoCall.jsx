@@ -22,22 +22,26 @@ const VideoCall = ({ room, socket, onLeave }) => {
     console.log("👥 Current peers:", peers.length);
   }, [socket, stream, peers]);
 
-  // Initialize media stream
+  // Initialize media stream with explicit logging
   useEffect(() => {
     const initMedia = async () => {
       try {
-        console.log("🎥 Initializing media stream...");
+        console.log("🎥 Starting media initialization...");
         const mediaStream = await navigator.mediaDevices.getUserMedia({
           video: true,
           audio: true,
         });
-        console.log("🎥 Media stream obtained successfully");
+        console.log("🎥 Media stream obtained:", {
+          video: mediaStream.getVideoTracks().length > 0,
+          audio: mediaStream.getAudioTracks().length > 0
+        });
         setStream(mediaStream);
         if (localVideoRef.current) {
+          console.log("🎥 Setting local video stream");
           localVideoRef.current.srcObject = mediaStream;
         }
       } catch (error) {
-        console.error("❌ Error accessing media devices:", error);
+        console.error("❌ Media initialization error:", error);
         addNotification("Error accessing camera/microphone", "error");
       }
     };
@@ -46,13 +50,14 @@ const VideoCall = ({ room, socket, onLeave }) => {
 
     return () => {
       if (stream) {
+        console.log("🧹 Cleaning up media stream");
         stream.getTracks().forEach(track => track.stop());
       }
     };
   }, []);
 
   const createPeer = (userToSignal, callerID, stream) => {
-    console.log("🎮 Creating peer connection for:", userToSignal);
+    console.log("🎮 Starting peer creation for:", userToSignal);
     const peer = new RTCPeerConnection({
       iceServers: [
         {
@@ -68,12 +73,12 @@ const VideoCall = ({ room, socket, onLeave }) => {
 
     console.log("🎮 Adding local tracks to peer connection");
     stream.getTracks().forEach(track => {
-      console.log("🎮 Adding track:", track.kind);
+      console.log(`🎮 Adding ${track.kind} track to peer`);
       peer.addTrack(track, stream);
     });
 
     peer.onicecandidate = (event) => {
-      console.log("❄️ ICE candidate generated");
+      console.log("❄️ ICE candidate event:", event.candidate ? "New candidate" : "End of candidates");
       if (event.candidate) {
         console.log("❄️ Sending ICE candidate to:", userToSignal);
         socket.emit("sending-signal", {
@@ -85,33 +90,44 @@ const VideoCall = ({ room, socket, onLeave }) => {
     };
 
     peer.ontrack = (event) => {
-      console.log("📹 Received remote track:", event.track.kind);
+      console.log("📹 Received remote track event:", {
+        kind: event.track.kind,
+        streamCount: event.streams.length
+      });
       const peerObj = peersRef.current.find(p => p.peerID === userToSignal);
       if (peerObj && peerObj.videoRef.current) {
         console.log("📹 Setting remote stream for peer:", userToSignal);
         peerObj.videoRef.current.srcObject = event.streams[0];
+      } else {
+        console.error("❌ Could not find peer or video element for:", userToSignal);
       }
     };
 
     peer.onconnectionstatechange = () => {
-      console.log("🔌 Peer connection state:", peer.connectionState);
+      console.log("🔌 Peer connection state changed:", peer.connectionState);
     };
 
     peer.onsignalingstatechange = () => {
-      console.log("📡 Peer signaling state:", peer.signalingState);
+      console.log("📡 Peer signaling state changed:", peer.signalingState);
     };
 
     return peer;
   };
 
-  // Handle peer connections
+  // Handle peer connections with explicit logging
   useEffect(() => {
-    if (!socket || !stream) return;
+    if (!socket || !stream) {
+      console.log("⚠️ Socket or stream not ready:", { socket: !!socket, stream: !!stream });
+      return;
+    }
 
-    console.log("🔌 Setting up socket listeners...");
+    console.log("🔌 Setting up socket listeners with stream:", {
+      video: stream.getVideoTracks().length > 0,
+      audio: stream.getAudioTracks().length > 0
+    });
 
     socket.on("user-joined", ({ peerID, userName }) => {
-      console.log("👋 New user joined:", peerID);
+      console.log("👋 New user joined event:", { peerID, userName });
       console.log("🎥 Current stream status:", stream.getTracks().map(t => t.kind));
       const peer = createPeer(peerID, socket.id, stream);
       peersRef.current.push({
@@ -123,8 +139,7 @@ const VideoCall = ({ room, socket, onLeave }) => {
     });
 
     socket.on("receiving-returned-signal", ({ signal, callerID }) => {
-      console.log("📡 Receiving returned signal from:", callerID);
-      console.log("📡 Signal type:", signal.type || "ICE candidate");
+      console.log("📡 Receiving signal from:", callerID, "Type:", signal.type || "ICE candidate");
       const item = peersRef.current.find(p => p.peerID === callerID);
       if (item) {
         console.log("📡 Setting remote description for peer:", callerID);
@@ -135,7 +150,7 @@ const VideoCall = ({ room, socket, onLeave }) => {
     });
 
     socket.on("user-left", ({ peerID }) => {
-      console.log("👋 User left:", peerID);
+      console.log("👋 User left event:", peerID);
       const peerObj = peersRef.current.find(p => p.peerID === peerID);
       if (peerObj) {
         console.log("🧹 Cleaning up peer connection for:", peerID);
