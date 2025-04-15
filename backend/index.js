@@ -12,7 +12,8 @@ const server = http.createServer(app);
 // CORS configuration
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:5173',
-  'https://newmeetingfinal.vercel.app'
+  'https://newmeetingfinal.vercel.app',
+  'http://localhost:5173'  // Add localhost for development
 ];
 
 const io = new Server(server, {
@@ -21,6 +22,7 @@ const io = new Server(server, {
       if (!origin || allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
+        console.log('CORS blocked origin:', origin);
         callback(new Error('Not allowed by CORS'));
       }
     },
@@ -35,7 +37,14 @@ const io = new Server(server, {
 });
 
 app.use(cors({
-  origin: allowedOrigins,
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST'],
   credentials: true
 }));

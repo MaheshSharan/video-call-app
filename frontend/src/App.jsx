@@ -6,7 +6,7 @@ import { NotificationProvider, useNotification } from "./contexts/NotificationCo
 
 const SOCKET_URL = import.meta.env.VITE_HOST === 'dev' 
   ? import.meta.env.VITE_SOCKET_URL 
-  : "http://localhost:5000"; // Backend URL
+  : 'http://localhost:5000';
 
 console.log('🌐 Environment:', import.meta.env.VITE_HOST);
 console.log('🔌 Backend URL:', SOCKET_URL);
@@ -36,23 +36,28 @@ function AppContent() {
     const connectSocket = () => {
       if (!socketRef.current && joined && room) {
         console.log('🔄 Connecting to backend...');
-        socketRef.current = io(SOCKET_URL, {
-          reconnection: true,
-          reconnectionAttempts: 5,
-          reconnectionDelay: 1000,
+        const socket = io(SOCKET_URL, {
           transports: ['polling', 'websocket'],
           upgrade: true,
           forceNew: true,
           secure: true,
           rejectUnauthorized: false,
           path: '/socket.io/',
-          timeout: 20000
+          timeout: 20000,
+          reconnection: true,
+          reconnectionAttempts: 5,
+          reconnectionDelay: 1000,
+          reconnectionDelayMax: 5000,
+          withCredentials: true,
+          extraHeaders: {
+            'Access-Control-Allow-Origin': '*'
+          }
         });
 
-        const socket = socketRef.current;
+        socketRef.current = socket;
 
-        socket.on("connect", () => {
-          console.log('✅ Connected to backend successfully!');
+        socket.on('connect', () => {
+          console.log('✅ Connected to backend:', socket.id);
           if (mounted) {
             setSocketConnected(true);
             if (!connectionNotificationRef.current) {
@@ -62,8 +67,19 @@ function AppContent() {
           }
         });
 
-        socket.on("disconnect", () => {
-          console.log('❌ Disconnected from backend');
+        socket.on('connect_error', (error) => {
+          console.error('⚠️ Connection error:', error.message);
+          console.error('Error details:', error);
+          if (mounted) {
+            addNotification("Connection error: " + error.message, "error");
+          }
+        });
+
+        socket.on('disconnect', (reason) => {
+          console.log('❌ Disconnected:', reason);
+          if (reason === 'io server disconnect') {
+            socket.connect();
+          }
           if (mounted) {
             setSocketConnected(false);
             connectionNotificationRef.current = null;
@@ -71,10 +87,10 @@ function AppContent() {
           }
         });
 
-        socket.on("connect_error", (error) => {
-          console.error('⚠️ Connection error:', error.message);
+        socket.on('error', (error) => {
+          console.error('❌ Socket error:', error);
           if (mounted) {
-            addNotification("Connection error: " + error.message, "error");
+            addNotification("Socket error: " + error.message, "error");
           }
         });
       }
