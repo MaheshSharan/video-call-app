@@ -94,6 +94,15 @@ app.get('/test', (req, res) => {
   }
 });
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  console.log('Health check ping received at:', new Date().toISOString());
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString()
+  });
+});
+
 // Room management and signaling
 const roomHosts = {};
 io.on('connection', (socket) => {
