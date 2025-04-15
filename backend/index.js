@@ -11,8 +11,8 @@ const server = http.createServer(app);
 
 // CORS configuration
 const allowedOrigins = [
-  process.env.FRONTEND_URL || 'http://localhost:5173', // Vercel frontend URL
-  'https://newmeetingfinal.vercel.app' // Your Vercel frontend URL
+  process.env.FRONTEND_URL || 'http://localhost:5173',
+  'https://newmeetingfinal.vercel.app'
 ];
 
 const io = new Server(server, {
@@ -26,7 +26,12 @@ const io = new Server(server, {
     },
     methods: ['GET', 'POST'],
     credentials: true
-  }
+  },
+  transports: ['websocket', 'polling'],
+  allowEIO3: true,
+  pingTimeout: 60000,
+  pingInterval: 25000,
+  cookie: false
 });
 
 app.use(cors({

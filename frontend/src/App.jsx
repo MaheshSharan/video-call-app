@@ -4,9 +4,13 @@ import './index.css';
 import VideoCall from "./VideoCall";
 import { NotificationProvider, useNotification } from "./contexts/NotificationContext";
 
-const SOCKET_URL = import.meta.env.VITE_HOST === 'prod' 
+const SOCKET_URL = import.meta.env.VITE_HOST === 'dev' 
   ? import.meta.env.VITE_SOCKET_URL 
   : "http://localhost:5000"; // Backend URL
+
+console.log('🌐 Environment:', import.meta.env.VITE_HOST);
+console.log('🔌 Backend URL:', SOCKET_URL);
+console.log('🚀 Running in:', import.meta.env.DEV ? 'Development' : 'Production');
 
 function generateRoomCode() {
   // Simple random code generator (6 uppercase letters/numbers)
@@ -31,16 +35,23 @@ function AppContent() {
 
     const connectSocket = () => {
       if (!socketRef.current && joined && room) {
+        console.log('🔄 Connecting to backend...');
         socketRef.current = io(SOCKET_URL, {
           reconnection: true,
           reconnectionAttempts: 5,
           reconnectionDelay: 1000,
           transports: ['websocket', 'polling'],
+          upgrade: true,
+          forceNew: true,
+          secure: true,
+          rejectUnauthorized: false,
+          path: '/socket.io/'
         });
 
         const socket = socketRef.current;
 
         socket.on("connect", () => {
+          console.log('✅ Connected to backend successfully!');
           if (mounted) {
             setSocketConnected(true);
             if (!connectionNotificationRef.current) {
@@ -51,6 +62,7 @@ function AppContent() {
         });
 
         socket.on("disconnect", () => {
+          console.log('❌ Disconnected from backend');
           if (mounted) {
             setSocketConnected(false);
             connectionNotificationRef.current = null;
@@ -59,6 +71,7 @@ function AppContent() {
         });
 
         socket.on("connect_error", (error) => {
+          console.error('⚠️ Connection error:', error.message);
           if (mounted) {
             addNotification("Connection error: " + error.message, "error");
           }
