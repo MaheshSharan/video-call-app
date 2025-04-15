@@ -159,7 +159,11 @@ io.on('connection', (socket) => {
 
   socket.on('chat-message', ({ roomId, message }) => {
     console.log(`[${socket.id}] chat in room ${roomId}:`, message);
-    io.to(roomId).emit('chat-message', { sender: socket.id, message });
+    // Only broadcast to other users in the room, not to the sender
+    socket.to(roomId).emit('chat-message', { 
+      sender: socket.id, 
+      message 
+    });
   });
 
   socket.on('disconnecting', () => {

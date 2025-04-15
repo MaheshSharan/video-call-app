@@ -14,6 +14,7 @@ const VideoCall = ({ room, socket, onLeave }) => {
   const peersRef = useRef([]);
   const { addNotification } = useNotification();
   const queuedIceCandidatesRef = useRef({});
+  const [messages, setMessages] = useState([]);
 
   // Debug logs
   useEffect(() => {
@@ -290,6 +291,36 @@ const VideoCall = ({ room, socket, onLeave }) => {
     if (totalPeers <= 2) return "grid-cols-1";
     if (totalPeers <= 4) return "grid-cols-2";
     return "grid-cols-3";
+  };
+
+  // Handle chat messages
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleChatMessage = ({ sender, message }) => {
+      console.log('Received chat message:', { sender, message });
+      // Only add message if it's not from the current user
+      if (sender !== socket.id) {
+        setMessages(prev => [...prev, { sender, message }]);
+      }
+    };
+
+    socket.on('chat-message', handleChatMessage);
+
+    return () => {
+      socket.off('chat-message', handleChatMessage);
+    };
+  }, [socket]);
+
+  const sendMessage = (message) => {
+    if (!message.trim() || !socket || !room) return;
+    
+    console.log('Sending chat message:', message);
+    // Add message to local state first
+    setMessages(prev => [...prev, { sender: socket.id, message }]);
+    
+    // Then emit to others
+    socket.emit('chat-message', { room, message });
   };
 
   return (
