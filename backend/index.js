@@ -103,102 +103,111 @@ app.get('/health', (req, res) => {
   });
 });
 
-// Room validation endpoint
+// Room metadata storage
+const roomMetadata = new Map();
+
+// Room cleanup interval (24 hours)
+const ROOM_EXPIRY_TIME = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+// Function to clean up expired rooms
+const cleanupExpiredRooms = () => {
+  const now = Date.now();
+  for (const [roomId, metadata] of roomMetadata.entries()) {
+    if (now - metadata.lastActivity > ROOM_EXPIRY_TIME) {
+      console.log(`Cleaning up expired room: ${roomId}`);
+      roomMetadata.delete(roomId);
+      // Notify all users in the room that it's expired
+      io.to(roomId).emit('room-expired');
+      // Force disconnect all users in the room
+      io.in(roomId).disconnectSockets(true);
+    }
+  }
+};
+
+// Run cleanup every hour
+setInterval(cleanupExpiredRooms, 60 * 60 * 1000);
+
+// Room validation endpoint with enhanced metadata
 app.get('/validate-room/:roomId', (req, res) => {
   const { roomId } = req.params;
   console.log('Validating room:', roomId);
   
-  // Check if room exists in active rooms
-  const roomExists = io.sockets.adapter.rooms.has(roomId);
-  
-  res.json({
-    exists: roomExists,
-    roomId: roomId,
-    timestamp: new Date().toISOString()
-  });
+  try {
+    // Check if room exists in active rooms
+    const roomExists = io.sockets.adapter.rooms.has(roomId);
+    const metadata = roomMetadata.get(roomId);
+    
+    if (roomExists && metadata) {
+      // Update last activity time
+      metadata.lastActivity = Date.now();
+      roomMetadata.set(roomId, metadata);
+      
+      res.json({
+        exists: true,
+        roomId: roomId,
+        createdAt: metadata.createdAt,
+        lastActivity: metadata.lastActivity,
+        participants: Array.from(io.sockets.adapter.rooms.get(roomId) || []).length,
+        timestamp: new Date().toISOString()
+      });
+    } else {
+      res.json({
+        exists: false,
+        roomId: roomId,
+        timestamp: new Date().toISOString()
+      });
+    }
+  } catch (error) {
+    console.error('Error validating room:', error);
+    res.status(500).json({
+      error: 'Internal server error',
+      message: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Room management and signaling
 const roomHosts = {};
-const activeConnections = new Map(); // Track active peer connections
-
 io.on('connection', (socket) => {
   console.log('New connection:', socket.id);
-  activeConnections.set(socket.id, {
-    rooms: new Set(),
-    lastPing: Date.now()
-  });
-
-  // Handle ping/pong for connection health
-  socket.on('ping', () => {
-    const connection = activeConnections.get(socket.id);
-    if (connection) {
-      connection.lastPing = Date.now();
-    }
-  });
 
   socket.on('join-room', (roomId) => {
     try {
       socket.join(roomId);
-      const connection = activeConnections.get(socket.id);
-      if (connection) {
-        connection.rooms.add(roomId);
+      
+      // Initialize or update room metadata
+      if (!roomMetadata.has(roomId)) {
+        roomMetadata.set(roomId, {
+          createdAt: Date.now(),
+          lastActivity: Date.now(),
+          host: socket.id
+        });
+      } else {
+        const metadata = roomMetadata.get(roomId);
+        metadata.lastActivity = Date.now();
+        roomMetadata.set(roomId, metadata);
       }
 
       const clients = Array.from(io.sockets.adapter.rooms.get(roomId) || []).filter(id => id !== socket.id);
-      
-      // Assign host if room is empty
-      if (!roomHosts[roomId]) {
-        roomHosts[roomId] = socket.id;
-        console.log(`[${socket.id}] assigned as host for room ${roomId}`);
-      }
-
       console.log(`[${socket.id}] joined room ${roomId}. Existing users:`, clients);
       
-      // Send room info to the new user
-      socket.emit('room-info', {
-        roomId,
-        isHost: roomHosts[roomId] === socket.id,
-        existingUsers: clients
-      });
-
-      // Notify existing users
-      socket.to(roomId).emit('user-joined', {
-        userId: socket.id,
-        isHost: roomHosts[roomId] === socket.id
-      });
+      socket.emit('all-users', clients);
+      socket.to(roomId).emit('user-joined', socket.id);
     } catch (error) {
-      console.error(`Error in join-room for ${socket.id}:`, error);
+      console.error('Error joining room:', error);
       socket.emit('error', { message: 'Failed to join room' });
     }
   });
 
   socket.on('signal', ({ roomId, data }) => {
-    try {
-      console.log(`[${socket.id}] signaling in room ${roomId}:`, data.type, '->', data.to || 'all');
-      
-      if (data.to) {
-        // Verify the target user is in the same room
-        const targetSocket = io.sockets.sockets.get(data.to);
-        if (targetSocket && targetSocket.rooms.has(roomId)) {
-          targetSocket.emit('signal', { 
-            sender: socket.id, 
-            data,
-            roomId 
-          });
-        } else {
-          console.warn(`Target user ${data.to} not found in room ${roomId}`);
-        }
-      } else {
-        socket.to(roomId).emit('signal', { 
-          sender: socket.id, 
-          data,
-          roomId 
-        });
-      }
-    } catch (error) {
-      console.error(`Error in signal handling for ${socket.id}:`, error);
-      socket.emit('error', { message: 'Failed to process signal' });
+    console.log(`[${socket.id}] signaling in room ${roomId}:`, data.type, '->', data.to || 'all');
+    if (data.to) {
+      // Send only to the intended recipient
+      io.to(data.to).emit('signal', { sender: socket.id, data });
+    } else {
+      // Broadcast to everyone else in the room (except sender)
+      socket.to(roomId).emit('signal', { sender: socket.id, data });
     }
   });
 
@@ -215,41 +224,30 @@ io.on('connection', (socket) => {
 
   socket.on('chat-message', ({ roomId, message }) => {
     console.log(`[${socket.id}] chat in room ${roomId}:`, message);
-    // Only broadcast to other users in the room, not to the sender
-    socket.to(roomId).emit('chat-message', { 
-      sender: socket.id, 
-      message 
-    });
+    io.to(roomId).emit('chat-message', { sender: socket.id, message });
   });
 
   socket.on('disconnecting', () => {
-    try {
-      const connection = activeConnections.get(socket.id);
-      if (connection) {
-        for (const roomId of connection.rooms) {
-          console.log(`[${socket.id}] leaving room ${roomId}`);
-          socket.to(roomId).emit('user-left', {
-            userId: socket.id,
-            wasHost: roomHosts[roomId] === socket.id
-          });
-
-          // Handle host transfer if needed
-          if (roomHosts[roomId] === socket.id) {
-            const roomMembers = Array.from(io.sockets.adapter.rooms.get(roomId) || []);
-            const newHost = roomMembers.find(id => id !== socket.id);
-            if (newHost) {
-              roomHosts[roomId] = newHost;
-              io.to(newHost).emit('host-transferred', { roomId });
-            } else {
-              delete roomHosts[roomId];
-            }
-          }
+    for (const roomId of socket.rooms) {
+      if (roomId !== socket.id) {
+        console.log(`[${socket.id}] leaving room ${roomId}`);
+        socket.to(roomId).emit('user-left', socket.id);
+        
+        // Update room metadata
+        if (roomMetadata.has(roomId)) {
+          const metadata = roomMetadata.get(roomId);
+          metadata.lastActivity = Date.now();
+          roomMetadata.set(roomId, metadata);
         }
       }
-    } catch (error) {
-      console.error(`Error in disconnecting handler for ${socket.id}:`, error);
-    } finally {
-      activeConnections.delete(socket.id);
+    }
+    // Check if this socket is the host
+    for (const roomId of socket.rooms) {
+      if (roomHosts[roomId] === socket.id) {
+        // Notify all users meeting is ended
+        socket.to(roomId).emit('meeting-ended');
+        delete roomHosts[roomId];
+      }
     }
   });
 });
