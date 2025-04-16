@@ -120,29 +120,85 @@ app.get('/validate-room/:roomId', (req, res) => {
 
 // Room management and signaling
 const roomHosts = {};
+const activeConnections = new Map(); // Track active peer connections
+
 io.on('connection', (socket) => {
   console.log('New connection:', socket.id);
+  activeConnections.set(socket.id, {
+    rooms: new Set(),
+    lastPing: Date.now()
+  });
+
+  // Handle ping/pong for connection health
+  socket.on('ping', () => {
+    const connection = activeConnections.get(socket.id);
+    if (connection) {
+      connection.lastPing = Date.now();
+    }
+  });
 
   socket.on('join-room', (roomId) => {
-    socket.join(roomId);
-    const clients = Array.from(io.sockets.adapter.rooms.get(roomId) || []).filter(id => id !== socket.id);
-    // Assign host if room is empty
-    if (!roomHosts[roomId]) {
-      roomHosts[roomId] = socket.id;
+    try {
+      socket.join(roomId);
+      const connection = activeConnections.get(socket.id);
+      if (connection) {
+        connection.rooms.add(roomId);
+      }
+
+      const clients = Array.from(io.sockets.adapter.rooms.get(roomId) || []).filter(id => id !== socket.id);
+      
+      // Assign host if room is empty
+      if (!roomHosts[roomId]) {
+        roomHosts[roomId] = socket.id;
+        console.log(`[${socket.id}] assigned as host for room ${roomId}`);
+      }
+
+      console.log(`[${socket.id}] joined room ${roomId}. Existing users:`, clients);
+      
+      // Send room info to the new user
+      socket.emit('room-info', {
+        roomId,
+        isHost: roomHosts[roomId] === socket.id,
+        existingUsers: clients
+      });
+
+      // Notify existing users
+      socket.to(roomId).emit('user-joined', {
+        userId: socket.id,
+        isHost: roomHosts[roomId] === socket.id
+      });
+    } catch (error) {
+      console.error(`Error in join-room for ${socket.id}:`, error);
+      socket.emit('error', { message: 'Failed to join room' });
     }
-    console.log(`[${socket.id}] joined room ${roomId}. Existing users:`, clients);
-    socket.emit('all-users', clients);
-    socket.to(roomId).emit('user-joined', socket.id);
   });
 
   socket.on('signal', ({ roomId, data }) => {
-    console.log(`[${socket.id}] signaling in room ${roomId}:`, data.type, '->', data.to || 'all');
-    if (data.to) {
-      // Send only to the intended recipient
-      io.to(data.to).emit('signal', { sender: socket.id, data });
-    } else {
-      // Broadcast to everyone else in the room (except sender)
-      socket.to(roomId).emit('signal', { sender: socket.id, data });
+    try {
+      console.log(`[${socket.id}] signaling in room ${roomId}:`, data.type, '->', data.to || 'all');
+      
+      if (data.to) {
+        // Verify the target user is in the same room
+        const targetSocket = io.sockets.sockets.get(data.to);
+        if (targetSocket && targetSocket.rooms.has(roomId)) {
+          targetSocket.emit('signal', { 
+            sender: socket.id, 
+            data,
+            roomId 
+          });
+        } else {
+          console.warn(`Target user ${data.to} not found in room ${roomId}`);
+        }
+      } else {
+        socket.to(roomId).emit('signal', { 
+          sender: socket.id, 
+          data,
+          roomId 
+        });
+      }
+    } catch (error) {
+      console.error(`Error in signal handling for ${socket.id}:`, error);
+      socket.emit('error', { message: 'Failed to process signal' });
     }
   });
 
@@ -167,19 +223,33 @@ io.on('connection', (socket) => {
   });
 
   socket.on('disconnecting', () => {
-    for (const roomId of socket.rooms) {
-      if (roomId !== socket.id) {
-        console.log(`[${socket.id}] leaving room ${roomId}`);
-        socket.to(roomId).emit('user-left', socket.id);
+    try {
+      const connection = activeConnections.get(socket.id);
+      if (connection) {
+        for (const roomId of connection.rooms) {
+          console.log(`[${socket.id}] leaving room ${roomId}`);
+          socket.to(roomId).emit('user-left', {
+            userId: socket.id,
+            wasHost: roomHosts[roomId] === socket.id
+          });
+
+          // Handle host transfer if needed
+          if (roomHosts[roomId] === socket.id) {
+            const roomMembers = Array.from(io.sockets.adapter.rooms.get(roomId) || []);
+            const newHost = roomMembers.find(id => id !== socket.id);
+            if (newHost) {
+              roomHosts[roomId] = newHost;
+              io.to(newHost).emit('host-transferred', { roomId });
+            } else {
+              delete roomHosts[roomId];
+            }
+          }
+        }
       }
-    }
-    // Check if this socket is the host
-    for (const roomId of socket.rooms) {
-      if (roomHosts[roomId] === socket.id) {
-        // Notify all users meeting is ended
-        socket.to(roomId).emit('meeting-ended');
-        delete roomHosts[roomId];
-      }
+    } catch (error) {
+      console.error(`Error in disconnecting handler for ${socket.id}:`, error);
+    } finally {
+      activeConnections.delete(socket.id);
     }
   });
 });

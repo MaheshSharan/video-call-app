@@ -17,6 +17,7 @@ export default function VideoCall({ room, socket, onLeave }) {
   const [activeTab, setActiveTab] = useState("chat"); // "chat" or "participants"
   const [remoteUserStatus, setRemoteUserStatus] = useState({}); // Track remote users' audio/video status
   const trackListenersRef = useRef({}); // For keeping track of event listeners across renders
+  const peersRef = useRef({}); // For keeping track of peer connections
 
   // Use the connection hook
   const { localStream, remoteStreams } = useWebRTCConnection({
@@ -873,3 +874,126 @@ export default function VideoCall({ room, socket, onLeave }) {
     </div>
   );
 }
+
+const createPeer = (userToSignal, callerID, stream) => {
+  console.log("🎮 Starting peer creation for:", userToSignal);
+  const peer = new RTCPeerConnection({
+    iceServers: [
+      {
+        urls: "stun:stun.l.google.com:19302",
+      },
+      {
+        urls: "turn:global.relay.metered.ca:80",
+        username: "openrelayproject",
+        credential: "openrelayproject",
+      },
+      {
+        urls: "turn:turn.bistri.com:80",
+        credential: "homeo",
+        username: "homeo"
+      },
+      {
+        urls: "turn:turn.anyfirewall.com:443?transport=tcp",
+        credential: "webrtc",
+        username: "webrtc"
+      }
+    ],
+    iceCandidatePoolSize: 10,
+    bundlePolicy: 'max-bundle',
+    rtcpMuxPolicy: 'require',
+    sdpSemantics: 'unified-plan'
+  });
+
+  // Set up connection state monitoring
+  peer.onconnectionstatechange = () => {
+    console.log(`🔌 Peer connection state with ${userToSignal}:`, peer.connectionState);
+    if (peer.connectionState === 'failed') {
+      console.log('Attempting to restart ICE...');
+      peer.restartIce();
+    }
+  };
+
+  peer.oniceconnectionstatechange = () => {
+    console.log(`❄️ ICE connection state with ${userToSignal}:`, peer.iceConnectionState);
+    if (peer.iceConnectionState === 'failed') {
+      console.log('ICE connection failed, attempting to recover...');
+      peer.restartIce();
+    }
+  };
+
+  peer.onsignalingstatechange = () => {
+    console.log(`📡 Signaling state with ${userToSignal}:`, peer.signalingState);
+  };
+
+  // Add local tracks with error handling
+  try {
+    console.log("🎮 Adding local tracks to peer connection");
+    stream.getTracks().forEach(track => {
+      console.log(`🎮 Adding ${track.kind} track to peer`);
+      peer.addTrack(track, stream);
+    });
+  } catch (error) {
+    console.error('Error adding tracks to peer:', error);
+    addNotification('Error setting up media connection', 'error');
+  }
+
+  // Handle ICE candidates with retry logic
+  peer.onicecandidate = (event) => {
+    console.log("❄️ ICE candidate event:", event.candidate ? "New candidate" : "End of candidates");
+    if (event.candidate) {
+      const maxRetries = 3;
+      let retryCount = 0;
+
+      const sendIceCandidate = () => {
+        socket.emit("sending-signal", {
+          userToSignal,
+          callerID,
+          signal: { candidate: event.candidate },
+        }).catch(error => {
+          console.error('Error sending ICE candidate:', error);
+          if (retryCount < maxRetries) {
+            retryCount++;
+            setTimeout(sendIceCandidate, 1000 * retryCount);
+          }
+        });
+      };
+
+      sendIceCandidate();
+    }
+  };
+
+  // Handle remote tracks with error recovery
+  peer.ontrack = (event) => {
+    console.log("📹 Received remote track event:", {
+      kind: event.track.kind,
+      streamCount: event.streams.length,
+      streams: event.streams.map(s => s.id)
+    });
+
+    const peerObj = peersRef.current.find(p => p.peerID === userToSignal);
+    if (peerObj && peerObj.videoRef.current) {
+      try {
+        console.log("📹 Setting remote stream for peer:", userToSignal);
+        peerObj.videoRef.current.srcObject = event.streams[0];
+        
+        // Set up error handling for the video element
+        peerObj.videoRef.current.onerror = (error) => {
+          console.error('Video element error:', error);
+          // Attempt to recover by reattaching the stream
+          setTimeout(() => {
+            if (peerObj.videoRef.current) {
+              peerObj.videoRef.current.srcObject = event.streams[0];
+            }
+          }, 1000);
+        };
+      } catch (error) {
+        console.error("Error setting remote stream:", error);
+        addNotification('Error receiving remote video', 'error');
+      }
+    } else {
+      console.error("❌ Could not find peer or video element for:", userToSignal);
+    }
+  };
+
+  return peer;
+};
