@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { io } from "socket.io-client";
 import './index.css';
-import VideoCall from "./components/VideoCall";
+import VideoCall from "./VideoCall";
 import { NotificationProvider, useNotification } from "./contexts/NotificationContext";
 import Loader from "./components/Loader";
 import { Analytics } from '@vercel/analytics/react';
