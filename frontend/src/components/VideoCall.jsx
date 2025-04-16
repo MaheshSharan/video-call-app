@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useNotification } from "./contexts/NotificationContext";
+import { useNotification } from "../contexts/NotificationContext";
 import { FaMicrophone, FaMicrophoneSlash, FaVideo, FaVideoSlash, FaPhone, FaExpand, FaCompress } from "react-icons/fa";
 
 const VideoCall = ({ room, socket, onLeave }) => {
